@@ -20,6 +20,7 @@ COPY money_agent ./money_agent
 
 EXPOSE 8402
 
-# waitress is a production WSGI server; build_app() returns the Flask app.
-# Cloud hosts set $PORT; default to 8402 locally.
-CMD ["sh", "-c", "waitress-serve --host=0.0.0.0 --port=${PORT:-8402} --call money_agent.service_x402:build_app"]
+# Start via Python so $PORT is parsed with a real int() (robust on every host:
+# Railway/Render inject $PORT, Fly/local default to 8402). Avoids shell-expansion
+# pitfalls (some hosts pass ${PORT:-8402} literally to the server).
+CMD ["python", "-c", "import os; from waitress import serve; from money_agent.service_x402 import build_app; serve(build_app(), host='0.0.0.0', port=int(os.environ.get('PORT', '8402')))"]
