@@ -151,6 +151,21 @@ Render.com:  push repo to GitHub -> New -> Blueprint -> it reads render.yaml and
     builds deploy/Dockerfile. Set env vars (PAY_TO, X402_NETWORK, X402_FACILITATOR,
     X402_BAZAAR=1, CDP keys) in the Render dashboard. You get a public URL.
 
+Fly.io (always-on 24/7, uses fly.toml; flyctl already installed):
+    fly auth login                      # browser sign-in (needs a card)
+    fly launch --copy-config --no-deploy
+    fly secrets set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
+    fly deploy                          # -> https://<app>.fly.dev
+
+Railway (uses railway.json; railway CLI already installed):
+    railway login                       # browser sign-in
+    railway init                        # create a project
+    railway up                          # build & deploy
+    railway variables --set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
+
+TIP: run cloud deploys from a NON-corporate network -- the work TLS proxy can
+     break CLI auth/uploads. All three hosts pay into the same PAY_TO wallet.
+
 -------------------------------------------------------------------------------
  AUTOMATION  (run the whole learning stack unattended)
 -------------------------------------------------------------------------------

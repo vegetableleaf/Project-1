@@ -388,10 +388,22 @@ kill-switch banner.
 
 ---
 
-## Cloud deployment (host the earner for free)
+## Cloud deployment (host the earner permanently)
 
-The earner is a plain web service, so any free container host works
-(Render / Railway / Fly.io). The image is lean (no torch).
+The earner is a plain Docker web service, so any container host works. Config
+files for **all three** providers are in the repo, all pointing at the same
+[`deploy/Dockerfile`](deploy/Dockerfile) — you can deploy to one or all of them
+(each gets its own public URL but all pay into the same `PAY_TO` wallet):
+
+| Provider | Config file | Needs GitHub? | Always-on? | Cost |
+| --- | --- | --- | --- | --- |
+| **Fly.io** | [`fly.toml`](fly.toml) | No (CLI uploads) | Yes (`min_machines_running=1`) | Card required, small |
+| **Railway** | [`railway.json`](railway.json) | No (CLI uploads) | Yes | Small free credit, then paid |
+| **Render** | [`render.yaml`](render.yaml) | Yes | Sleeps when idle, wakes on request | Free, no card |
+
+The `flyctl` and `railway` CLIs are already installed on this machine. Deploys
+should be run from a **non-corporate network** (the work TLS proxy can break CLI
+auth/uploads).
 
 ```powershell
 # Build & smoke-test locally (NOTE: on the corporate network the facilitator
@@ -401,16 +413,31 @@ docker run -d --name magent-x402-test -p 8403:8402 `
   -e "PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096" -e "PORT=8402" money-agent-x402
 ```
 
-### Deploy to Render (simplest)
+### Fly.io — always-on 24/7 (uses fly.toml)
+```powershell
+fly auth login                              # browser sign-in (needs a card)
+fly launch --copy-config --no-deploy        # creates the app from fly.toml
+fly secrets set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
+# (mainnet + CDP facilitator also: fly secrets set CDP_API_KEY_ID=... CDP_API_KEY_SECRET=...)
+fly deploy                                  # → https://<app>.fly.dev
+```
+
+### Railway (uses railway.json)
+```powershell
+railway login                               # browser sign-in
+railway init                                # create a project
+railway up                                  # build & deploy from railway.json
+railway variables --set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
+# set X402_NETWORK / X402_FACILITATOR / X402_BAZAAR / CDP keys the same way
+```
+
+### Render — free, no card (uses render.yaml)
 1. Push this repo to GitHub.
-2. In Render: **New → Blueprint**, point it at the repo. It reads
-   [`render.yaml`](render.yaml) and builds [`deploy/Dockerfile`](deploy/Dockerfile).
-3. Set env vars in the Render dashboard: `PAY_TO`, `X402_NETWORK` (`base` for
-   real money), `X402_FACILITATOR`, `X402_BAZAAR=1`, and CDP keys if using the
-   CDP facilitator.
+2. In Render: **New → Blueprint**, point it at the repo (reads `render.yaml`).
+3. Set env vars in the dashboard: `PAY_TO`, `X402_NETWORK`, `X402_FACILITATOR`,
+   `X402_BAZAAR=1`, and CDP keys if using the CDP facilitator.
 4. Render gives you a public HTTPS URL. Buyers hit `/service/<name>` and pay to
-   `PAY_TO`. Because there's no corporate proxy, the facilitator TLS call
-   succeeds and the server returns proper 402 → 200.
+   `PAY_TO`. No corporate proxy → the facilitator call succeeds (402 → 200).
 
 The container reads on-chain state from JSON files the host reporters produce; on
 a cloud host the earner simply accepts payments — balance reporting for the
