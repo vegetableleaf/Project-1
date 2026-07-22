@@ -22,6 +22,53 @@ a spend cap and kill switch, and deployable to a free cloud host.
 
 ---
 
+## Resuming on a new device (unrestricted network)
+
+The **only** thing blocking a live deploy on the old machine was its corporate TLS
+proxy. On a normal network, finishing is a one-command job. State to resume from:
+
+- Code is **complete and committed** (branch `main`): 15 x402 services, `cdp_swap`,
+  safety guard, all deploy configs. The lean image is **validated locally** (boots,
+  serves, honors `$PORT`).
+- Railway project **`money-agent-x402`** already exists with URL
+  **https://money-agent-x402-production.up.railway.app** and env vars set
+  (`PAY_TO`, testnet `X402_NETWORK=eip155:84532`, `X402_FACILITATOR=x402.org`,
+  `PORT=8402`). It just needs a clean build upload.
+- Logins used: Fly + Railway as `vegetable.leaf@gmail.com`.
+
+**Finish the deploy (pick one):**
+
+```powershell
+# Install the CLIs on the new device if needed:
+winget install Fly-io.flyctl ;  npm install -g @railway/cli
+
+# --- Railway (project already set up) ---
+railway login
+railway link            # choose project money-agent-x402
+railway up --service money-agent-x402       # clean network => build succeeds
+
+# --- OR Fly.io (always-on; app already created) ---
+fly auth login
+fly deploy              # remote builder works off-corporate-network
+fly secrets set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
+
+# --- OR Render (free, no card) ---
+# push this repo to GitHub, then in Render: New -> Blueprint (reads render.yaml)
+```
+
+**Verify it's live:**
+```powershell
+curl.exe -s "https://<your-url>/"                       # HTML menu of 15 services
+curl.exe -s -o NUL -w "%{http_code}\n" "https://<your-url>/service/uuid?input=2"   # expect 402
+```
+(On a normal network you don't need `--ssl-no-revoke`.)
+
+**Then go to real money** (only after testnet works): set `X402_NETWORK=eip155:8453`,
+`X402_FACILITATOR=https://api.cdp.coinbase.com/platform/v2/x402`, add
+`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET`, and `X402_BAZAAR=1` to get discovered.
+
+---
+
 ## Handoff: current state (read this first)
 
 **What exists and works today:**
@@ -56,10 +103,21 @@ a spend cap and kill switch, and deployable to a free cloud host.
 - **Public exposure proven:** a Cloudflare tunnel (`cloudflared`) exposed the
   local x402 server to the internet and a request from outside returned **HTTP
   402 Payment Required** to the funded wallet — i.e. a real stranger could pay it.
-- **Cloud deploy validated:** [`deploy/Dockerfile`](deploy/Dockerfile) +
-  [`render.yaml`](render.yaml) build a lean (no-torch) image that boots and
-  serves. It was tested locally; the only failure was the corporate TLS wall
-  (below), which does **not** exist on a real cloud host.
+- **Cloud deploy — staged on Railway, blocked ONLY by the corporate network:**
+  the earner is fully configured on Railway (project `money-agent-x402`, public URL
+  **https://money-agent-x402-production.up.railway.app** provisioned, env vars set,
+  testnet config) but the container is **not serving yet (HTTP 502)** because the
+  corporate TLS proxy corrupts the build upload (`railway logs -b` →
+  *"Deployment does not have an associated build"*). Fly.io is blocked the same way
+  (proxy fails Fly's builder + registry push). **This is purely a network issue —
+  on an unrestricted network the deploy completes with one command** (see
+  "Resuming on a new device" below). The image itself is validated locally: it
+  boots, serves all 15 services, and honors an injected `$PORT`. Configs for all
+  three hosts are in the repo ([`fly.toml`](fly.toml), [`railway.json`](railway.json),
+  [`render.yaml`](render.yaml)), all using [`deploy/Dockerfile`](deploy/Dockerfile),
+  which starts via `python -c "... waitress.serve(build_app(), port=int(os.environ['PORT']))"`
+  so `$PORT` is parsed robustly (an earlier crash came from a host passing
+  `${PORT:-8402}` literally to the server).
 
 **Known caveats / honest truths:**
 
