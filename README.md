@@ -37,7 +37,9 @@ a spend cap and kill switch, and deployable to a free cloud host.
   real **Base Sepolia testnet** wallet backend.
 - **Real income path (this is the part that actually earns money):** an **x402**
   payment-gated HTTP server ([`money_agent/service_x402.py`](money_agent/service_x402.py))
-  sells small services (text stats, keyword extraction, the trained model's
+  sells **15 small services** (summarize, sentiment, readability, JSON & CSV
+  tools, hashing, UUID/token generation, regex extraction, number stats, keyword
+  extraction, text stats, plus the trained model's
   market signal, etc.) for fractions of a cent in **USDC**. Buyers pay per
   request; the server verifies payment via an x402 facilitator and settles to a
   real wallet.
@@ -183,7 +185,7 @@ Everything lives in the `money_agent/` package unless noted. Run modules with
 ### Real income (x402 service selling)
 | File | What it does |
 | --- | --- |
-| [`money_agent/service.py`](money_agent/service.py) | `Marketplace` + `Service` dataclasses. Sellable services: `text_stats`, `shout`, `keywords`, `sma_signal`, and **`market_signal`** (sells the trained model's prediction). Earnings tracking. `build_extended_services(cfg)`. |
+| [`money_agent/service.py`](money_agent/service.py) | `Marketplace` + `Service` dataclasses. **15 sellable services** (all pure-stdlib except `market_signal`): `text_stats`, `shout`, `keywords`, `sma_signal`, `summarize`, `sentiment`, `readability`, `json_tools`, `csv_to_json`, `hash`, `uuid`, `token`, `extract`, `num_stats`, and **`market_signal`** (sells the trained model's prediction). Earnings tracking. `build_extended_services(cfg)`. |
 | [`money_agent/service_x402.py`](money_agent/service_x402.py) | Flask app with **x402 payment middleware** on `GET /service/<name>` (port 8402). Price = service price / 1000 USD. Records sales to `x402_sales.json`. `X402_BAZAAR=1` attaches discovery metadata. `build_app()` is the entry point for waitress/gunicorn. |
 | [`money_agent/x402_buyer.py`](money_agent/x402_buyer.py) | A simulated paying customer (eth_account + x402 client). Signs and submits payment to test the full pay→verify→settle loop. |
 | [`money_agent/safety.py`](money_agent/safety.py) | `SpendGuard` — **30% daily spend cap** + **kill switch**. State in `spend_state.json`, rolls per day. CLI: `python -m money_agent.safety`. |
@@ -476,7 +478,10 @@ Secrets and generated state (`*.pth`, `*.onnx`, `*.json`, logs, `prices_*.csv`,
 Suggested next steps, roughly in priority order:
 
 1. **Deploy the earner to a real cloud host** (Render/Railway/Fly) so it earns
-   24/7 without your laptop and without the corporate-TLS wall. Then switch
+   24/7 without your laptop and without the corporate-TLS wall. The repo is
+   already **git-initialized** (branch `main`, secrets git-ignored) and the image
+   is validated with all 15 services. Push to GitHub, then on Render do
+   **New → Blueprint** (it reads [`render.yaml`](render.yaml)). Then switch
    `X402_NETWORK=base` + the CDP facilitator to accept real USDC, and set
    `X402_BAZAAR=1` so buyers can discover it.
 2. **Gas / ETH (only needed to move funds OUT — earning is gasless).** Receiving

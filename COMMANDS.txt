@@ -92,6 +92,10 @@ python -m money_agent.service_x402
     Start the payment-gated web server on http://localhost:8402. Each
     GET /service/<name> returns HTTP 402 until the caller pays USDC, then returns
     the result. Earning is gasless (you need 0 ETH to receive).
+    Available <name> (15 services): text_stats, shout, keywords, sma_signal,
+      summarize, sentiment, readability, json_tools, csv_to_json, hash, uuid,
+      token, extract, num_stats, market_signal.
+      Example:  GET /service/summarize?input=your+long+text+here
     Key env vars:
       $env:PAY_TO = "0xeb4B12234218a7A56932a5395d730Ac1ae1C6096"   # your wallet
       $env:X402_NETWORK = "base-sepolia"      # TESTNET first! ("base" = real money)
