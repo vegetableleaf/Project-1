@@ -2,7 +2,11 @@
 # The model-backed "market_signal" service degrades gracefully without torch;
 # the other services (text_stats, shout, keywords, sma_signal) work fully.
 # To also serve the model, add:  torch numpy  and COPY a checkpoint.pth into the image.
-x402[flask,evm]>=2.16
+x402[flask,evm,extensions]>=2.16
 httpx>=0.28
 truststore>=0.9
 waitress>=3.0
+# cdp-sdk is needed ONLY for the CDP facilitator (Base mainnet) + x402 Bazaar.
+# The testnet facilitator (x402.org) does not use it. Included so the mainnet
+# switch is a config change, not a rebuild.
+cdp-sdk>=1.47

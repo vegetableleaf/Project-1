@@ -120,7 +120,25 @@ def build_app():
     services = build_extended_services(Config())
 
     app = Flask(__name__)
-    facilitator = HTTPFacilitatorClientSync(FacilitatorConfig(url=FACILITATOR))
+    # Choose the facilitator. The free testnet facilitator (x402.org) needs no
+    # auth. The CDP facilitator (Base mainnet + the x402 Bazaar) requires CDP
+    # API-key auth headers -- cdp.x402.create_facilitator_config wires those up.
+    if "cdp.coinbase.com" in FACILITATOR:
+        cdp_key_id = os.environ.get("CDP_API_KEY_ID", "").strip()
+        cdp_key_secret = os.environ.get("CDP_API_KEY_SECRET", "").strip()
+        if not (cdp_key_id and cdp_key_secret):
+            raise SystemExit("The CDP facilitator needs CDP_API_KEY_ID and "
+                             "CDP_API_KEY_SECRET. Set them, or use the free "
+                             "testnet facilitator https://x402.org/facilitator.")
+        try:
+            from cdp.x402 import create_facilitator_config
+        except ImportError as exc:  # pragma: no cover - optional dep
+            raise SystemExit("The CDP facilitator needs the CDP SDK: "
+                             "pip install cdp-sdk") from exc
+        facilitator_config = create_facilitator_config(cdp_key_id, cdp_key_secret)
+    else:
+        facilitator_config = FacilitatorConfig(url=FACILITATOR)
+    facilitator = HTTPFacilitatorClientSync(facilitator_config)
     server = x402ResourceServerSync(facilitator)
     server.register(NETWORK, ExactEvmServerScheme())
 

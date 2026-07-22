@@ -1,6 +1,18 @@
 # Render.com Blueprint -- deploy the x402 service with one click.
 # In Render: New -> Blueprint -> point at this repo. Then set the secret env
 # vars (PAY_TO, and CDP keys if using the CDP facilitator) in the dashboard.
+#
+# TESTNET (default below): works with just PAY_TO set. No CDP keys needed.
+#
+# SWITCH TO MAINNET + BAZAAR (real USDC) -- change these in the Render dashboard:
+#   X402_NETWORK      = eip155:8453
+#   X402_FACILITATOR  = https://api.cdp.coinbase.com/platform/v2/x402
+#   X402_BAZAAR       = 1
+#   CDP_API_KEY_ID     = <your CDP Secret API key id>      (create a NEW, dedicated
+#   CDP_API_KEY_SECRET = <your CDP Secret API key secret>   key for this deployment)
+# The image already bundles cdp-sdk, so this is a config change -- no rebuild.
+# (You do NOT need CDP_WALLET_SECRET here: receiving x402 payments never moves
+#  your own funds, so the Wallet Secret is not required on the server.)
 services:
   - type: web
     name: money-agent-x402

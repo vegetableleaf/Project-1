@@ -422,10 +422,23 @@ cloudflared tunnel --url http://localhost:8402
 
 Switch these to accept real USDC on Base mainnet:
 ```powershell
-$env:X402_NETWORK = "base"
+$env:X402_NETWORK = "eip155:8453"
 $env:X402_FACILITATOR = "https://api.cdp.coinbase.com/platform/v2/x402"
-# plus CDP_API_KEY_ID / CDP_API_KEY_SECRET (the CDP facilitator needs auth)
+$env:CDP_API_KEY_ID = "..."       # a DEDICATED CDP Secret API key (see note)
+$env:CDP_API_KEY_SECRET = "..."
 ```
+
+**Which CDP API key?** The CDP API keys are tied to your CDP **account/project**,
+not to a network — the same key works for testnet and mainnet (the network is
+chosen by `X402_NETWORK`, not the key). You do **not** need a separate "test"
+account. Best practice: **create a NEW, dedicated Secret API key** just for the
+deployed server (CDP Portal → API Keys → Secret API Keys → Create), so you can
+rotate/revoke it independently of your local tooling. You do **not** need the
+**Wallet Secret** (`CDP_WALLET_SECRET`) on the server — receiving x402 payments
+never moves your own funds. `service_x402.py` auto-wires CDP auth via
+`cdp.x402.create_facilitator_config` when `X402_FACILITATOR` points at
+`api.cdp.coinbase.com`, and `cdp-sdk` is bundled in the deploy image, so this is
+a pure config change — no rebuild.
 
 ### List it on the x402 Bazaar (discovery)
 
