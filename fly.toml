@@ -1,45 +1,28 @@
-# fly.toml -- deploy the x402 earner to Fly.io (always-on, 24/7).
+# fly.toml app configuration file generated for money-agent-x402 on 2026-07-22T16:01:39-04:00
 #
-# One-time setup (from the project root, ideally on a NON-corporate network):
-#   1) Install the CLI:   iwr https://fly.io/install.ps1 -useb | iex
-#   2) Sign in:           fly auth login        (opens a browser; needs a card)
-#   3) Create the app:    fly launch --copy-config --no-deploy
-#        - if the name below is taken, Fly will ask for a new unique one
-#   4) Set your secrets:  fly secrets set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
-#        (for the CDP facilitator / Bazaar also:)
-#        fly secrets set CDP_API_KEY_ID=... CDP_API_KEY_SECRET=...
-#   5) Deploy:            fly deploy
-#   6) Your URL:          https://<app-name>.fly.dev  (try /  then /service/uuid)
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# TESTNET first (X402_NETWORK below = Base Sepolia). Switch to mainnet only when
-# you are ready to take real USDC (see the [env] comments).
 
-app = "money-agent-x402"
-primary_region = "iad"
+app = 'money-agent-x402'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "deploy/Dockerfile"
+  dockerfile = 'deploy/Dockerfile'
 
 [env]
-  PORT = "8402"
-  # PAY_TO is a public address, so it's fine here; override via `fly secrets set` if you prefer.
-  PAY_TO = "0xeb4B12234218a7A56932a5395d730Ac1ae1C6096"
-  # eip155:84532 = Base Sepolia (test). For REAL money use eip155:8453 (Base mainnet).
-  X402_NETWORK = "eip155:84532"
-  # x402.org (free test facilitator). For mainnet use the CDP facilitator:
-  #   https://api.cdp.coinbase.com/platform/v2/x402   (also set CDP_API_KEY_ID/SECRET as secrets)
-  X402_FACILITATOR = "https://x402.org/facilitator"
-  # "1" to publish to the x402 Bazaar (needs the CDP facilitator + a public URL).
-  X402_BAZAAR = "0"
+  PAY_TO = '0xeb4B12234218a7A56932a5395d730Ac1ae1C6096'
+  PORT = '8402'
+  X402_BAZAAR = '0'
+  X402_FACILITATOR = 'https://x402.org/facilitator'
+  X402_NETWORK = 'eip155:84532'
 
 [http_service]
   internal_port = 8402
   force_https = true
-  # Keep it always running (24/7). Set auto_stop_machines = "stop" to save money.
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
