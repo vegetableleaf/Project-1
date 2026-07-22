@@ -1,0 +1,8 @@
+# Extra dependency for the Base Sepolia (on-chain) wallet backend.
+# Install with:  pip install -r requirements-chain.txt
+web3>=6.11
+# Makes Python trust the OS certificate store, so the RPC's HTTPS connection
+# works behind corporate TLS inspection / custom root CAs (common on work PCs).
+truststore>=0.9
+# Optional: Coinbase CDP wallet for the agent (money_agent/cdp_wallet.py).
+cdp-sdk>=1.0

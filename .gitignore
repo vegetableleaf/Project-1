@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# money_agent runtime artifacts
+money_ledger.sqlite*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# TESTNET keystore -- contains private keys, never commit (even testnet ones)
+chain_accounts.json
+
+# Secrets -- NEVER commit these. Seed phrases & private keys give full wallet access.
+.env
+*.key
+*.pem
+recovery.txt
+seed*.txt
+mnemonic*.txt
+secret*.txt
+
+# Model checkpoints & exports (training artifacts, can be large)
+*.pth
+*.pth.tmp
+*.onnx
+onnx_models/
+
+# Runtime logs
+training.log
+status.json
+chain_status.json
+chain_report.log
+earnings_report.log
+earnings_status.json
+x402_sales.json
+cdp_wallet.json
+spend_state.json

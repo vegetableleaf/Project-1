@@ -1,0 +1,6 @@
+numpy>=1.24
+torch>=2.0
+# Resumable checkpoints use .pth (built into torch). Exporting portable .onnx
+# snapshots of each model needs these two (optional -- export is skipped if absent).
+onnx>=1.16
+onnxscript>=0.1

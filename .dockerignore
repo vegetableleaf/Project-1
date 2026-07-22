@@ -1,0 +1,17 @@
+# Keep the Docker build context small.
+.git
+__pycache__/
+*.pyc
+.venv/
+venv/
+dashboard/
+*.sqlite
+*.sqlite-*
+*.pth
+*.pth.tmp
+onnx_models/
+*.log
+*.json
+prices_*.csv
+recovery.txt
+.env

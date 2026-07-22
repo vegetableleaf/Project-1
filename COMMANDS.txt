@@ -1,0 +1,173 @@
+===============================================================================
+ money_agent - COMMAND REFERENCE  (plain-text cheat sheet)
+===============================================================================
+Run everything from the project root:  C:\Users\bzhu\Documents\Project1
+Every Python tool runs as a module:    python -m money_agent.<name>
+
+If a "python" command below doesn't work, use the full interpreter path:
+  C:\Users\bzhu\AppData\Local\Python\pythoncore-3.14-64\python.exe -m money_agent.<name>
+
+NOTE FOR THE COPILOT AI: when you add or change a command, update BOTH this file
+and README.md in the same turn. README.md is the source of truth for project state.
+
+-------------------------------------------------------------------------------
+ SETUP (install dependencies)
+-------------------------------------------------------------------------------
+pip install -r requirements.txt
+    Core deps for training & evaluation (torch, numpy, ...).
+
+pip install -r requirements-chain.txt
+    Extra deps for the Base Sepolia testnet wallet (web3, eth-account, truststore).
+
+pip install -r requirements-x402.txt
+    Extra deps to run the x402 earner + test buyer (x402[flask,evm], httpx, waitress).
+
+pip install cdp-sdk
+    The Coinbase CDP wallet SDK (for cdp_wallet / cdp_swap / earnings_report).
+
+-------------------------------------------------------------------------------
+ TRAINING & EVALUATION  (the AI learning experiment - safe, offline)
+-------------------------------------------------------------------------------
+python -m money_agent.train
+    Train the population of RL agents on REAL BTC-USD price history.
+    Evolves each generation (mercy / terminate / clone). Prints a per-generation
+    line including loss= (the GAE actor-critic learning loss). Writes status.json,
+    money_ledger.sqlite, and checkpoints (.pth / .onnx).
+    Useful env vars (set before running):
+      $env:MONEY_AGENT_FOREVER = "1"        # run forever (never stop)
+      $env:MONEY_AGENT_GENERATIONS = "50"   # or a fixed number of generations
+      $env:MONEY_AGENT_LOOP_DELAY = "2"     # seconds to pause between generations
+      $env:MONEY_AGENT_BACKEND = "ledger"   # money store: "ledger" or "base_sepolia"
+
+python -m money_agent.evaluate
+    Run the best saved model on HELD-OUT test data and report mean return, win
+    rate, % of windows that beat buy-and-hold, Sharpe ratio, and max drawdown.
+    Reality check: the model currently does NOT beat buy-and-hold.
+
+-------------------------------------------------------------------------------
+ TESTNET WALLET  (real on-chain, but play money - Base Sepolia)
+-------------------------------------------------------------------------------
+python -m money_agent.chain
+    Print the testnet treasury address so you can fund it from a faucet.
+    Needs:  $env:BASE_SEPOLIA_PRIVATE_KEY = "0xYOUR_THROWAWAY_TESTNET_KEY"
+
+python -m money_agent.chain_report --watch 30
+    Every 30s, read testnet balances and write chain_status.json for the
+    dashboard. (Runs on the Windows host because it needs real TLS.)
+
+-------------------------------------------------------------------------------
+ REAL WALLET  (Coinbase CDP - holds your real USDC)
+-------------------------------------------------------------------------------
+Needs these secrets set first (from https://portal.cdp.coinbase.com):
+  $env:CDP_API_KEY_ID     = "..."
+  $env:CDP_API_KEY_SECRET = "..."
+  $env:CDP_WALLET_SECRET  = "..."
+
+python -m money_agent.cdp_wallet
+    Show the agent's real wallet address and token balances.
+    (Current wallet: 0xeb4B12234218a7A56932a5395d730Ac1ae1C6096, ~5.14 USDC on
+     Base mainnet, 0 ETH.)
+
+python -m money_agent.cdp_wallet --fund
+    Request FREE testnet ETH from the faucet (testnet networks only).
+
+python -m money_agent.cdp_swap
+    DRY RUN: quote swapping $1 of USDC into native ETH (for gas). Moves nothing.
+    Options:
+      python -m money_agent.cdp_swap --usd 1.5            # quote a specific amount
+      python -m money_agent.cdp_swap --usd 1.0 --execute  # ACTUALLY swap (real $)
+    Note: the swap itself needs a little ETH already in the wallet to pay gas, so
+    the FIRST ETH must come from Coinbase (buy ~$1-2 ETH, send to the wallet on
+    the Base network). After that, this tool tops up ETH from your USDC earnings.
+
+python -m money_agent.earnings_report --watch 30
+    Every 30s, read the CDP wallet's ETH+USDC balance, merge x402 sales, compute
+    the spend-guard status, and write earnings_status.json for the dashboard.
+    For MAINNET set:  $env:CDP_NETWORK = "base"   (omit / "base-sepolia" for testnet)
+
+-------------------------------------------------------------------------------
+ EARNING REAL MONEY  (x402 - sell services for USDC over the internet)
+-------------------------------------------------------------------------------
+python -m money_agent.service_x402
+    Start the payment-gated web server on http://localhost:8402. Each
+    GET /service/<name> returns HTTP 402 until the caller pays USDC, then returns
+    the result. Earning is gasless (you need 0 ETH to receive).
+    Key env vars:
+      $env:PAY_TO = "0xeb4B12234218a7A56932a5395d730Ac1ae1C6096"   # your wallet
+      $env:X402_NETWORK = "base-sepolia"      # TESTNET first! ("base" = real money)
+      $env:X402_FACILITATOR = "https://x402.org/facilitator"   # free testnet facilitator
+      $env:X402_BAZAAR = "1"                  # list on the x402 Bazaar (discovery)
+      $env:SERVICE_X402_PORT = "8402"         # port (or PORT)
+    Mainnet facilitator (real USDC): https://api.cdp.coinbase.com/platform/v2/x402
+      (also needs CDP_API_KEY_ID / CDP_API_KEY_SECRET)
+
+python -m money_agent.x402_buyer
+    Simulate a paying customer end-to-end (sign + submit payment) to test the
+    full pay -> verify -> settle loop.
+    Needs:  $env:X402_PRIVATE_KEY = "0xTESTNET_KEY_WITH_TEST_USDC"
+
+python -m money_agent.safety
+    Show the spend guard: the 30%-per-day spend cap and the kill switch (halts
+    spending when the balance is empty). State lives in spend_state.json.
+
+-------------------------------------------------------------------------------
+ DASHBOARD  (watch everything live - Docker, http://localhost:8000)
+-------------------------------------------------------------------------------
+docker compose up -d --build
+    Build & start the dashboard container. Reads money_ledger.sqlite, status.json,
+    chain_status.json, earnings_status.json. Run the reporters above to fill the
+    on-chain / earnings panels.
+
+docker compose down
+    Stop the dashboard.
+
+docker compose logs -f
+    Follow the dashboard container logs.
+
+-------------------------------------------------------------------------------
+ EXPOSE TO THE INTERNET  (let real users pay you)
+-------------------------------------------------------------------------------
+cloudflared tunnel --url http://localhost:8402
+    Give the local x402 server a public https URL so anyone on the internet can
+    call /service/<name> and pay. (Proven working: an outside request returned
+    HTTP 402 to the funded wallet.)
+
+-------------------------------------------------------------------------------
+ CLOUD DEPLOY  (host the earner 24/7 for free)
+-------------------------------------------------------------------------------
+docker build -f deploy/Dockerfile -t money-agent-x402 .
+    Build the lean (no-torch) cloud image that serves the x402 earner.
+
+docker run -d --name magent-x402-test -p 8403:8402 `
+  -e "PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096" -e "PORT=8402" money-agent-x402
+    Smoke-test the image locally. NOTE: on the corporate network the facilitator
+    TLS call fails (expected here); it works on a real cloud host.
+
+Render.com:  push repo to GitHub -> New -> Blueprint -> it reads render.yaml and
+    builds deploy/Dockerfile. Set env vars (PAY_TO, X402_NETWORK, X402_FACILITATOR,
+    X402_BAZAAR=1, CDP keys) in the Render dashboard. You get a public URL.
+
+-------------------------------------------------------------------------------
+ AUTOMATION  (run the whole learning stack unattended)
+-------------------------------------------------------------------------------
+powershell -ExecutionPolicy Bypass -File .\run_training.ps1
+    Starts the forever-trainer + chain_report --watch + earnings_report --watch
+    with a kill-guard and clean UTF-8 logging. Point a Windows Scheduled Task at
+    this file to keep the colony training and the dashboard fed.
+
+-------------------------------------------------------------------------------
+ QUICK TROUBLESHOOTING
+-------------------------------------------------------------------------------
+* HTTPS / SSL "self-signed certificate in certificate chain":
+    You are behind the corporate TLS proxy. Python fixes this on the HOST via
+    truststore (already in the code). Linux Docker containers can't use the
+    Windows cert store, so run reporters on the host / deploy to a real cloud host.
+* curl gives a revocation error:
+    use  curl.exe --ssl-no-revoke <url>
+* Dashboard panels empty:
+    make sure the matching reporter is running (chain_report / earnings_report)
+    and its *_status.json file exists in the project root.
+* "cannot pay gas" on a swap or send:
+    the wallet has USDC but ~0 ETH. Buy ~$1-2 ETH on Coinbase and send it to the
+    wallet address on the Base network.
+===============================================================================

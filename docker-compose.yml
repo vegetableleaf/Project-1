@@ -1,0 +1,28 @@
+# money_agent dashboard.
+#   Start it:  docker compose up -d --build
+#   Open it:   http://localhost:8000
+#   Stop it:   docker compose down
+#
+# The container reads the trainer's output files (money_ledger.sqlite,
+# training.log) from the mounted project folder. It opens the database
+# read-only and never writes to your files.
+services:
+  dashboard:
+    build: ./dashboard
+    container_name: money_agent_dashboard
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the project folder so the container can read the trainer output.
+      # NOTE: the container can read everything in this folder. Keep secrets
+      # (seed phrases, real keys) out of it -- see .gitignore / recovery.txt.
+      - ./:/data
+    environment:
+      LEDGER_DB: /data/money_ledger.sqlite
+      STATUS_JSON: /data/status.json
+      CHAIN_STATUS: /data/chain_status.json
+      EARNINGS_STATUS: /data/earnings_status.json
+      VAULT_ACCOUNT: __vault__
+      PORT: "8000"
+      REFRESH_SECONDS: "5"
+    restart: unless-stopped

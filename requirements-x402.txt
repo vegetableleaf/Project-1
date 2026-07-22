@@ -1,0 +1,5 @@
+# Extra dependencies for accepting REAL crypto payments over HTTP via x402.
+# Install with:  pip install -r requirements-x402.txt
+x402[flask]>=2.16
+httpx>=0.28
+truststore>=0.9

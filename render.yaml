@@ -1,0 +1,23 @@
+# Render.com Blueprint -- deploy the x402 service with one click.
+# In Render: New -> Blueprint -> point at this repo. Then set the secret env
+# vars (PAY_TO, and CDP keys if using the CDP facilitator) in the dashboard.
+services:
+  - type: web
+    name: money-agent-x402
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: PAY_TO                 # your receiving wallet (0x... CDP address)
+        sync: false
+      - key: X402_NETWORK           # eip155:84532 = Base Sepolia (test); eip155:8453 = Base mainnet (real)
+        value: eip155:84532
+      - key: X402_FACILITATOR       # x402.org (test) or CDP: https://api.cdp.coinbase.com/platform/v2/x402
+        value: https://x402.org/facilitator
+      - key: X402_BAZAAR            # "1" to publish to the x402 Bazaar (needs the CDP facilitator)
+        value: "0"
+      - key: CDP_API_KEY_ID         # only needed for the CDP facilitator / Bazaar
+        sync: false
+      - key: CDP_API_KEY_SECRET
+        sync: false
