@@ -5,7 +5,6 @@
     "dockerfilePath": "deploy/Dockerfile"
   },
   "deploy": {
-    "startCommand": "waitress-serve --host=0.0.0.0 --port=${PORT:-8402} --call money_agent.service_x402:build_app",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
