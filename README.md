@@ -22,29 +22,36 @@ a spend cap and kill switch, and deployable to a free cloud host.
 
 ---
 
-## Deploy status (LIVE on testnet — 2026-07-22)
+## Deploy status (LIVE on Base MAINNET — 2026-07-23)
 
-On an unrestricted network the corporate-TLS blocker is gone and the earner is
-**deployed and serving**. Current live state:
+The corporate-TLS blocker is gone on an unrestricted network, and the earner is
+**deployed on all three hosts and accepting REAL USDC on Base mainnet**. Current
+live state:
 
 | Target | URL | Status | Network |
 | --- | --- | --- | --- |
-| **Fly.io** (always-on) | https://money-agent-x402.fly.dev/ | **LIVE** (root 200, paid routes 402) | testnet `eip155:84532` |
-| **Railway** | https://money-agent-x402-production.up.railway.app/ | **LIVE** (root 200, paid routes 402) | testnet `eip155:84532` |
-| **Render** | (create via Blueprint) | **code pushed to GitHub**, awaiting Blueprint | testnet default |
+| **Fly.io** (always-on) | https://money-agent-x402.fly.dev/ | **LIVE** (200 / 402) | **mainnet `eip155:8453`** |
+| **Railway** | https://money-agent-x402-production.up.railway.app/ | **LIVE** (200 / 402) | **mainnet `eip155:8453`** |
+| **Render** (free; sleeps when idle) | https://money-agent-x402-1qbj.onrender.com/ | **LIVE** (200 / 402) | **mainnet `eip155:8453`** |
 | **Dashboard** | http://localhost:8000/ | **LIVE** (Docker) | local |
 
-- Code is on GitHub: **https://github.com/vegetableleaf/Project-1** (branch `main`,
-  at `19d6aea`; the repo is public so Render can read it).
+All three verified returning a real mainnet 402: `network eip155:8453`, asset
+`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (**USD Coin**), `payTo`
+`0xeb4B12234218a7A56932a5395d730Ac1ae1C6096`, CDP facilitator, and
+`X402_BAZAAR=1` (Bazaar discovery metadata attached). Receiving is gasless — the
+0-ETH wallet accepts payments fine; ETH is only needed to *cash out*.
+
+- Code is on GitHub: **https://github.com/vegetableleaf/Project-1** (branch `main`;
+  the repo is public so Render can read it). `render.yaml` / `fly.toml` default to
+  mainnet; Railway vars set server-side.
 - Tooling installed on this device: `flyctl` (v0.4.71), `railway` (5.28.0),
   `node`/`npm`, `git`, Docker Desktop.
-- Logins: Fly + Railway as `vegetable.leaf@gmail.com`.
-
-**Finish Render (web UI — the only remaining testnet step):**
-1. Go to https://dashboard.render.com → **New → Blueprint**.
-2. Connect GitHub and pick **vegetableleaf/Project-1** (it reads `render.yaml`).
-3. Set **`PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096`** in the dashboard
-   (it's `sync:false`). Testnet needs nothing else. **Apply** → you get a URL.
+- Logins: Fly + Railway as `vegetable.leaf@gmail.com`; Render + GitHub as
+  `vegetableleaf`.
+- **CDP keys** (`CDP_API_KEY_ID` + `CDP_API_KEY_SECRET`) are set on all three hosts
+  (Fly secrets, Railway variables, Render env). One CDP Secret API key serves both
+  testnet and mainnet — see the credential table below. `CDP_WALLET_SECRET` is
+  **not** on the servers (receiving never moves funds).
 
 **Verify any deploy is live:**
 ```powershell
@@ -112,24 +119,25 @@ chat):
 - **Public exposure proven:** a Cloudflare tunnel (`cloudflared`) exposed the
   local x402 server to the internet and a request from outside returned **HTTP
   402 Payment Required** to the funded wallet — i.e. a real stranger could pay it.
-- **Cloud deploy — LIVE on testnet (Fly + Railway), serving publicly:**
-  the earner is deployed and returning **HTTP 402** to outside callers on two
-  always-reachable hosts:
-  **https://money-agent-x402.fly.dev/** (Fly.io, always-on) and
-  **https://money-agent-x402-production.up.railway.app/** (Railway). Both run the
-  testnet config (`X402_NETWORK=eip155:84532`, `X402_FACILITATOR=x402.org`,
-  `PAY_TO` set). Render is one web-UI step away (code is pushed to
-  **github.com/vegetableleaf/Project-1**; do **New → Blueprint**). The earlier
+- **Cloud deploy — LIVE on Base MAINNET (all 3 hosts), accepting real USDC:**
+  the earner is deployed and returning **HTTP 402** to outside callers on three
+  hosts:
+  **https://money-agent-x402.fly.dev/** (Fly.io, always-on),
+  **https://money-agent-x402-production.up.railway.app/** (Railway), and
+  **https://money-agent-x402-1qbj.onrender.com/** (Render, free/sleeps-when-idle).
+  All run mainnet (`X402_NETWORK=eip155:8453`, CDP facilitator, `X402_BAZAAR=1`,
+  `PAY_TO` set) with `CDP_API_KEY_ID`/`CDP_API_KEY_SECRET` set per host. Verified
+  402s carry the mainnet USDC asset and settle to the funded wallet. The earlier
   502 was purely the corporate TLS proxy corrupting the build upload — gone on
   this unrestricted network. The lean image boots, serves all 15 services, and
   honors `$PORT`. Configs for all three hosts are in the repo
   ([`fly.toml`](fly.toml), [`railway.json`](railway.json),
   [`render.yaml`](render.yaml)), all using [`deploy/Dockerfile`](deploy/Dockerfile),
   which starts via `python -c "... waitress.serve(build_app(), port=int(os.environ['PORT']))"`
-  so `$PORT` is parsed robustly. **Still on testnet** — flip to mainnet by setting
-  `X402_NETWORK=eip155:8453` + the CDP facilitator + `CDP_API_KEY_ID`/`SECRET`
-  (see "Where credentials are needed" up top). The server crash-loops on mainnet
-  until those CDP keys are set.
+  so `$PORT` is parsed robustly. **Note:** the CDP facilitator requires the CDP
+  keys at boot — a mainnet deploy crash-loops (502) until `CDP_API_KEY_ID` and
+  `CDP_API_KEY_SECRET` are present (this is what caused Railway's transient 502
+  until the keys were added).
 
 **Known caveats / honest truths:**
 

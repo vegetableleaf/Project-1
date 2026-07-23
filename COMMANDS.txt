@@ -139,10 +139,11 @@ cloudflared tunnel --url http://localhost:8402
 -------------------------------------------------------------------------------
  CLOUD DEPLOY  (host the earner 24/7 for free)
 -------------------------------------------------------------------------------
-LIVE (testnet, 2026-07-22):
+LIVE (Base MAINNET, real USDC, 2026-07-23):
   Fly.io   -> https://money-agent-x402.fly.dev/                      (always-on)
   Railway  -> https://money-agent-x402-production.up.railway.app/
-  Render   -> pending Blueprint (code pushed to github.com/vegetableleaf/Project-1)
+  Render   -> https://money-agent-x402-1qbj.onrender.com/           (free; sleeps idle)
+  All 3: X402_NETWORK=eip155:8453, CDP facilitator, X402_BAZAAR=1, CDP keys set.
   Verify:  curl.exe -s -o NUL -w "%{http_code}\n" https://<url>/service/uuid?input=2   # 402
 
 docker build -f deploy/Dockerfile -t money-agent-x402 .
