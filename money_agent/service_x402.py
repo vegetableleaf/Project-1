@@ -115,9 +115,14 @@ def build_app():
     except ImportError as exc:  # pragma: no cover - optional dep
         raise SystemExit('Install the x402 Flask package:  pip install "x402[flask]"') from exc
 
+    from .pricing import DemandPricer
     from .service import build_extended_services
 
     services = build_extended_services(Config())
+    # Demand-aware dynamic pricing: each service's price is resolved live, per
+    # request, from how much it is actually being bought (see pricing.py and the
+    # /pricing endpoint). Set X402_DYNAMIC_PRICING=0 to pin the base prices.
+    pricer = DemandPricer({name: svc.price for name, svc in services.items()})
 
     app = Flask(__name__)
     # Choose the facilitator. The free testnet facilitator (x402.org) needs no
@@ -145,9 +150,9 @@ def build_app():
     routes: dict = {
         f"GET /service/{name}": RouteConfig(
             accepts=[PaymentOption(scheme="exact", pay_to=_PAY_TO,
-                                   price=_usd(svc.price), network=NETWORK)],
+                                   price=pricer.price_hook(name), network=NETWORK)],
             mime_type="application/json",
-            description=f"{svc.name} service (pay {_usd(svc.price)} USDC per call)",
+            description=f"{svc.name} service (demand-priced USDC; live rates at /pricing)",
         )
         for name, svc in services.items()
     }
@@ -157,9 +162,9 @@ def build_app():
     def _make_handler(service):
         def handler():
             result = service.fulfill(request.args.get("input", ""))
-            _record_sale(service.name, service.price)
+            _record_sale(service.name, pricer.price_units(service.name))
             return jsonify({"service": service.name,
-                            "price_usd": _usd(service.price),
+                            "price_usd": pricer.usd(service.name),
                             "result": result})
         handler.__name__ = f"svc_{service.name}"
         return handler
@@ -170,13 +175,19 @@ def build_app():
     @app.route("/")
     def index():
         items = "".join(
-            f"<li><code>GET /service/{n}?input=...</code> &mdash; {_usd(s.price)} USDC</li>"
+            f"<li><code>GET /service/{n}?input=...</code> &mdash; {pricer.usd(n)} USDC</li>"
             for n, s in services.items())
         return (f"<h1>Agent x402 services</h1>"
                 f"<p>Pay-per-call with USDC on <code>{NETWORK}</code>. "
                 f"Receiving wallet: <code>{PAY_TO or '(set PAY_TO!)'}</code></p>"
+                f"<p>Prices adjust automatically to demand &mdash; live analysis "
+                f"at <a href=\"/pricing\">/pricing</a>.</p>"
                 f"<ul>{items}</ul>"
                 f"<p>Unpaid calls return HTTP 402 with payment instructions.</p>")
+
+    @app.route("/pricing")
+    def pricing():
+        return jsonify(pricer.analysis())
 
     return app
 

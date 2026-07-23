@@ -231,6 +231,13 @@ PAGE = """<!doctype html>
   th, td { text-align:left; padding:10px 14px; font-size:13px; border-bottom:1px solid #1e2740; }
   th { background:#1a2233; color:#8b98b0; font-weight:600; }
   tr:last-child td { border-bottom:none; }
+  /* Wallets list: show ~8 rows at once; scroll for the rest (exact height set in JS). */
+  #wallets { max-height:360px; overflow-y:auto; border:1px solid #263149; border-radius:12px; }
+  #wallets table { border:none; border-radius:0; }
+  #wallets thead th { position:sticky; top:0; z-index:1; }
+  #wallets::-webkit-scrollbar { width:10px; }
+  #wallets::-webkit-scrollbar-thumb { background:#2b3856; border-radius:8px; }
+  #wallets::-webkit-scrollbar-track { background:#0f1420; }
   .pos { color:#3fb950; } .neg { color:#f85149; }
   .pill { font-family:ui-monospace, monospace; font-size:12px; color:#c9d4e8; }
   .empty { padding:40px; text-align:center; color:#8b98b0;
@@ -299,6 +306,20 @@ function setView(v) {
 }
 const card = (label, value) =>
   `<div class="card"><div class="label">${esc(label)}</div><div class="value">${value}</div></div>`;
+
+// Constrain a scrollable table to show exactly `n` body rows (header + n rows);
+// any extra rows stay reachable via the container's scrollbar.
+function clampRows(id, n) {
+  const box = document.getElementById(id);
+  if (!box) return;
+  const head = box.querySelector('thead tr');
+  const rows = box.querySelectorAll('tbody tr');
+  const hh = head ? head.getBoundingClientRect().height : 0;
+  if (!head || hh === 0 || rows.length <= n) { box.style.maxHeight = ''; return; }
+  let h = hh;
+  for (let i = 0; i < n; i++) h += rows[i].getBoundingClientRect().height;
+  box.style.maxHeight = (Math.ceil(h) + 1) + 'px';
+}
 
 function drawChart(series) {
   const box = document.getElementById('chart');
@@ -421,6 +442,7 @@ async function refresh() {
     w += `<tr><td class="pill">${esc(row.account_id)}</td><td>${money(row.balance)}</td></tr>`;
   w += '</tbody></table>';
   document.getElementById('wallets').innerHTML = w;
+  clampRows('wallets', 8);   // show 8 agents at once; scroll to reach the others
 
   let t = '<table><thead><tr><th>Time</th><th>Wallet</th><th>Change</th>' +
           '<th>Balance after</th><th>Reason</th></tr></thead><tbody>';
