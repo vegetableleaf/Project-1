@@ -64,13 +64,17 @@ def _maybe_add_bazaar_metadata(routes) -> None:
         return
     for key, route in routes.items():
         name = key.rsplit("/", 1)[-1]
+        desc, example = _SERVICE_META.get(name, (f"The {name} service.", "your input here"))
         ext = declare_discovery_extension(
-            input={"input": "BTC-USD"},
+            input={"input": example},
             input_schema={"type": "object",
+                          "title": name,
+                          "description": desc,
                           "properties": {"input": {"type": "string",
-                                                   "description": "request payload / query"}},
+                                                   "description": f"{desc} e.g. {example!r}"}},
                           "required": ["input"]},
-            output=OutputConfig(example={"service": name, "result": "..."}),
+            output=OutputConfig(example={"service": name, "price_usd": "$0.0x",
+                                         "result": "<computed result>"}),
         )
         try:
             route.extensions = ext
@@ -249,7 +253,8 @@ def build_app():
             accepts=[PaymentOption(scheme="exact", pay_to=_PAY_TO,
                                    price=pricer.price_hook(name), network=NETWORK)],
             mime_type="application/json",
-            description=f"{svc.name} service (demand-priced USDC; live rates at /pricing)",
+            description=(_SERVICE_META.get(name, (f"{svc.name} service.", ""))[0]
+                        + " Demand-priced in USDC; live rates at /pricing."),
         )
         for name, svc in services.items()
     }
@@ -272,8 +277,41 @@ def build_app():
     for name, svc in services.items():
         app.add_url_rule(f"/service/{name}", view_func=_make_handler(svc))
 
+    def _catalog():
+        """Structured, machine-readable service catalog for agents/crawlers."""
+        return {
+            "name": "Agent Services (x402)",
+            "description": "Pay-per-call micro-APIs settled in USDC over the open x402 standard.",
+            "x402_version": 2,
+            "network": NETWORK,
+            "pay_to": PAY_TO or None,
+            "pricing_endpoint": "/pricing",
+            "count": len(services),
+            "services": [
+                {
+                    "name": n,
+                    "description": _SERVICE_META.get(n, (f"The {n} service.", ""))[0],
+                    "endpoint": f"/service/{n}",
+                    "method": "GET",
+                    "price_usd": pricer.usd(n),
+                    "input": {"param": "input", "type": "string",
+                              "example": _SERVICE_META.get(n, ("", "your input here"))[1]},
+                    "output": {"type": "application/json",
+                               "shape": {"service": n, "price_usd": "string", "result": "string"}},
+                }
+                for n in services
+            ],
+        }
+
+    @app.route("/services.json")
+    def services_json():
+        return jsonify(_catalog())
+
     @app.route("/")
     def index():
+        # Agents/crawlers that ask for JSON get the structured catalog; browsers get HTML.
+        if "application/json" in request.headers.get("Accept", "").lower():
+            return jsonify(_catalog())
         cards = []
         for n in services:
             desc, example = _SERVICE_META.get(n, (f"The {n} service.", "your input here"))
