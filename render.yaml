@@ -1,16 +1,17 @@
 # Render.com Blueprint -- deploy the x402 service with one click.
-# In Render: New -> Blueprint -> point at this repo. Then set the secret env
-# vars (PAY_TO, and CDP keys if using the CDP facilitator) in the dashboard.
+# In Render: New -> Blueprint -> point at this repo. Then set the three secret
+# env vars it prompts for (PAY_TO, CDP_API_KEY_ID, CDP_API_KEY_SECRET).
 #
-# TESTNET (default below): works with just PAY_TO set. No CDP keys needed.
+# MAINNET (active below): accepts REAL USDC on Base mainnet via the CDP
+# facilitator and lists on the x402 Bazaar. Requires a CDP Secret API key
+# (CDP_API_KEY_ID + CDP_API_KEY_SECRET) -- the server needs them at boot on
+# mainnet. Create a NEW, dedicated key for this deployment.
 #
-# SWITCH TO MAINNET + BAZAAR (real USDC) -- change these in the Render dashboard:
-#   X402_NETWORK      = eip155:8453
-#   X402_FACILITATOR  = https://api.cdp.coinbase.com/platform/v2/x402
-#   X402_BAZAAR       = 1
-#   CDP_API_KEY_ID     = <your CDP Secret API key id>      (create a NEW, dedicated
-#   CDP_API_KEY_SECRET = <your CDP Secret API key secret>   key for this deployment)
-# The image already bundles cdp-sdk, so this is a config change -- no rebuild.
+# REVERT TO TESTNET (free, no CDP keys) -- change these values below:
+#   X402_NETWORK      = eip155:84532
+#   X402_FACILITATOR  = https://x402.org/facilitator
+#   X402_BAZAAR       = 0
+# The image already bundles cdp-sdk, so switching network is a config change.
 # (You do NOT need CDP_WALLET_SECRET here: receiving x402 payments never moves
 #  your own funds, so the Wallet Secret is not required on the server.)
 services:
@@ -23,13 +24,13 @@ services:
     envVars:
       - key: PAY_TO                 # your receiving wallet (0x... CDP address)
         sync: false
-      - key: X402_NETWORK           # eip155:84532 = Base Sepolia (test); eip155:8453 = Base mainnet (real)
-        value: eip155:84532
-      - key: X402_FACILITATOR       # x402.org (test) or CDP: https://api.cdp.coinbase.com/platform/v2/x402
-        value: https://x402.org/facilitator
+      - key: X402_NETWORK           # eip155:8453 = Base mainnet (real); eip155:84532 = Base Sepolia (test)
+        value: eip155:8453
+      - key: X402_FACILITATOR       # CDP (mainnet) or x402.org test: https://x402.org/facilitator
+        value: https://api.cdp.coinbase.com/platform/v2/x402
       - key: X402_BAZAAR            # "1" to publish to the x402 Bazaar (needs the CDP facilitator)
-        value: "0"
-      - key: CDP_API_KEY_ID         # only needed for the CDP facilitator / Bazaar
+        value: "1"
+      - key: CDP_API_KEY_ID         # required on mainnet (CDP facilitator / Bazaar)
         sync: false
       - key: CDP_API_KEY_SECRET
         sync: false
