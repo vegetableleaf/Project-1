@@ -22,50 +22,59 @@ a spend cap and kill switch, and deployable to a free cloud host.
 
 ---
 
-## Resuming on a new device (unrestricted network)
+## Deploy status (LIVE on testnet — 2026-07-22)
 
-The **only** thing blocking a live deploy on the old machine was its corporate TLS
-proxy. On a normal network, finishing is a one-command job. State to resume from:
+On an unrestricted network the corporate-TLS blocker is gone and the earner is
+**deployed and serving**. Current live state:
 
-- Code is **complete and committed** (branch `main`): 15 x402 services, `cdp_swap`,
-  safety guard, all deploy configs. The lean image is **validated locally** (boots,
-  serves, honors `$PORT`).
-- Railway project **`money-agent-x402`** already exists with URL
-  **https://money-agent-x402-production.up.railway.app** and env vars set
-  (`PAY_TO`, testnet `X402_NETWORK=eip155:84532`, `X402_FACILITATOR=x402.org`,
-  `PORT=8402`). It just needs a clean build upload.
-- Logins used: Fly + Railway as `vegetable.leaf@gmail.com`.
+| Target | URL | Status | Network |
+| --- | --- | --- | --- |
+| **Fly.io** (always-on) | https://money-agent-x402.fly.dev/ | **LIVE** (root 200, paid routes 402) | testnet `eip155:84532` |
+| **Railway** | https://money-agent-x402-production.up.railway.app/ | **LIVE** (root 200, paid routes 402) | testnet `eip155:84532` |
+| **Render** | (create via Blueprint) | **code pushed to GitHub**, awaiting Blueprint | testnet default |
+| **Dashboard** | http://localhost:8000/ | **LIVE** (Docker) | local |
 
-**Finish the deploy (pick one):**
+- Code is on GitHub: **https://github.com/vegetableleaf/Project-1** (branch `main`,
+  at `19d6aea`; the repo is public so Render can read it).
+- Tooling installed on this device: `flyctl` (v0.4.71), `railway` (5.28.0),
+  `node`/`npm`, `git`, Docker Desktop.
+- Logins: Fly + Railway as `vegetable.leaf@gmail.com`.
 
-```powershell
-# Install the CLIs on the new device if needed:
-winget install Fly-io.flyctl ;  npm install -g @railway/cli
+**Finish Render (web UI — the only remaining testnet step):**
+1. Go to https://dashboard.render.com → **New → Blueprint**.
+2. Connect GitHub and pick **vegetableleaf/Project-1** (it reads `render.yaml`).
+3. Set **`PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096`** in the dashboard
+   (it's `sync:false`). Testnet needs nothing else. **Apply** → you get a URL.
 
-# --- Railway (project already set up) ---
-railway login
-railway link            # choose project money-agent-x402
-railway up --service money-agent-x402       # clean network => build succeeds
-
-# --- OR Fly.io (always-on; app already created) ---
-fly auth login
-fly deploy              # remote builder works off-corporate-network
-fly secrets set PAY_TO=0xeb4B12234218a7A56932a5395d730Ac1ae1C6096
-
-# --- OR Render (free, no card) ---
-# push this repo to GitHub, then in Render: New -> Blueprint (reads render.yaml)
-```
-
-**Verify it's live:**
+**Verify any deploy is live:**
 ```powershell
 curl.exe -s "https://<your-url>/"                       # HTML menu of 15 services
 curl.exe -s -o NUL -w "%{http_code}\n" "https://<your-url>/service/uuid?input=2"   # expect 402
 ```
-(On a normal network you don't need `--ssl-no-revoke`.)
 
-**Then go to real money** (only after testnet works): set `X402_NETWORK=eip155:8453`,
-`X402_FACILITATOR=https://api.cdp.coinbase.com/platform/v2/x402`, add
-`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET`, and `X402_BAZAAR=1` to get discovered.
+**Go to real money (mainnet)** — see the "Where credentials are needed" table
+below. Per host set `X402_NETWORK=eip155:8453`,
+`X402_FACILITATOR=https://api.cdp.coinbase.com/platform/v2/x402`, `X402_BAZAAR=1`,
+and add **`CDP_API_KEY_ID`/`CDP_API_KEY_SECRET`** (a dedicated CDP Secret API key).
+⚠️ The server **crash-loops on mainnet without the CDP keys** (they're required at
+boot when the facilitator is CDP), so set the keys in the same step you flip the
+network.
+
+### Where credentials are needed (test vs. real money)
+
+| Secret / value | Needed on the deployed earner? | Testnet | Mainnet | Notes |
+| --- | --- | --- | --- | --- |
+| `PAY_TO` (wallet address `0xeb4B…6096`) | **Yes** (all hosts) | ✅ | ✅ | Public address, not a secret. Already set on Fly + Railway. |
+| `CDP_API_KEY_ID` + `CDP_API_KEY_SECRET` | **Yes, for mainnet only** | ❌ not needed | ✅ **required** | One CDP **Secret API key** works for BOTH testnet and mainnet — the *network* is chosen by `X402_NETWORK`, not the key. There is **no separate "test account" key**. Best practice: create a **new, dedicated** key for the deployment (CDP Portal → API Keys → Secret API Keys). |
+| `CDP_WALLET_SECRET` | **No** | ❌ | ❌ | Receiving x402 payments never moves your own funds, so the servers do **not** need the Wallet Secret. Only local fund-*moving* tools (`cdp_swap`, cash-out) use it. |
+| `X402_PRIVATE_KEY` | No (local test buyer only) | local only | — | Only for `x402_buyer.py` to simulate a paying customer. |
+| `BASE_SEPOLIA_PRIVATE_KEY` | No (local testnet wallet only) | local only | — | Only for the local Base Sepolia treasury wallet. |
+
+Where to put the CDP keys per host (type them yourself — never paste secrets into
+chat):
+- **Fly:** `flyctl secrets set CDP_API_KEY_ID=... CDP_API_KEY_SECRET=...`
+- **Railway:** `railway variables --set "CDP_API_KEY_ID=..." --set "CDP_API_KEY_SECRET=..."`
+- **Render:** dashboard → the service → **Environment** → add both keys.
 
 ---
 
@@ -103,21 +112,24 @@ curl.exe -s -o NUL -w "%{http_code}\n" "https://<your-url>/service/uuid?input=2"
 - **Public exposure proven:** a Cloudflare tunnel (`cloudflared`) exposed the
   local x402 server to the internet and a request from outside returned **HTTP
   402 Payment Required** to the funded wallet — i.e. a real stranger could pay it.
-- **Cloud deploy — staged on Railway, blocked ONLY by the corporate network:**
-  the earner is fully configured on Railway (project `money-agent-x402`, public URL
-  **https://money-agent-x402-production.up.railway.app** provisioned, env vars set,
-  testnet config) but the container is **not serving yet (HTTP 502)** because the
-  corporate TLS proxy corrupts the build upload (`railway logs -b` →
-  *"Deployment does not have an associated build"*). Fly.io is blocked the same way
-  (proxy fails Fly's builder + registry push). **This is purely a network issue —
-  on an unrestricted network the deploy completes with one command** (see
-  "Resuming on a new device" below). The image itself is validated locally: it
-  boots, serves all 15 services, and honors an injected `$PORT`. Configs for all
-  three hosts are in the repo ([`fly.toml`](fly.toml), [`railway.json`](railway.json),
+- **Cloud deploy — LIVE on testnet (Fly + Railway), serving publicly:**
+  the earner is deployed and returning **HTTP 402** to outside callers on two
+  always-reachable hosts:
+  **https://money-agent-x402.fly.dev/** (Fly.io, always-on) and
+  **https://money-agent-x402-production.up.railway.app/** (Railway). Both run the
+  testnet config (`X402_NETWORK=eip155:84532`, `X402_FACILITATOR=x402.org`,
+  `PAY_TO` set). Render is one web-UI step away (code is pushed to
+  **github.com/vegetableleaf/Project-1**; do **New → Blueprint**). The earlier
+  502 was purely the corporate TLS proxy corrupting the build upload — gone on
+  this unrestricted network. The lean image boots, serves all 15 services, and
+  honors `$PORT`. Configs for all three hosts are in the repo
+  ([`fly.toml`](fly.toml), [`railway.json`](railway.json),
   [`render.yaml`](render.yaml)), all using [`deploy/Dockerfile`](deploy/Dockerfile),
   which starts via `python -c "... waitress.serve(build_app(), port=int(os.environ['PORT']))"`
-  so `$PORT` is parsed robustly (an earlier crash came from a host passing
-  `${PORT:-8402}` literally to the server).
+  so `$PORT` is parsed robustly. **Still on testnet** — flip to mainnet by setting
+  `X402_NETWORK=eip155:8453` + the CDP facilitator + `CDP_API_KEY_ID`/`SECRET`
+  (see "Where credentials are needed" up top). The server crash-loops on mainnet
+  until those CDP keys are set.
 
 **Known caveats / honest truths:**
 
@@ -575,13 +587,15 @@ Secrets and generated state (`*.pth`, `*.onnx`, `*.json`, logs, `prices_*.csv`,
 
 Suggested next steps, roughly in priority order:
 
-1. **Deploy the earner to a real cloud host** (Render/Railway/Fly) so it earns
-   24/7 without your laptop and without the corporate-TLS wall. The repo is
-   already **git-initialized** (branch `main`, secrets git-ignored) and the image
-   is validated with all 15 services. Push to GitHub, then on Render do
-   **New → Blueprint** (it reads [`render.yaml`](render.yaml)). Then switch
-   `X402_NETWORK=base` + the CDP facilitator to accept real USDC, and set
-   `X402_BAZAAR=1` so buyers can discover it.
+1. **Cloud deploy — DONE for Fly + Railway (testnet), Render pending one web-UI
+   step.** Fly (https://money-agent-x402.fly.dev/) and Railway
+   (https://money-agent-x402-production.up.railway.app/) are live and returning
+   402. Code is on GitHub (`vegetableleaf/Project-1`); finish Render with
+   **New → Blueprint** (reads [`render.yaml`](render.yaml)). **Next: flip to
+   mainnet** — set `X402_NETWORK=eip155:8453`, the CDP facilitator, `X402_BAZAAR=1`,
+   and the `CDP_API_KEY_ID`/`CDP_API_KEY_SECRET` secrets on each host (see "Where
+   credentials are needed" near the top). The server needs those keys at boot on
+   mainnet.
 2. **Gas / ETH (only needed to move funds OUT — earning is gasless).** Receiving
    x402 payments needs 0 ETH. You only need a little ETH to send/cash-out USDC.
    Simplest: buy ~\$1–2 of ETH on Coinbase and send it to

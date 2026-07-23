@@ -39,3 +39,8 @@ earnings_status.json
 x402_sales.json
 cdp_wallet.json
 spend_state.json
+
+# Local deploy/build logs (generated during cloud deploys)
+build.log
+dashboard_build.log
+fly_deploy.log
