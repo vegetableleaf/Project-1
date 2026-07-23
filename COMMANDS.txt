@@ -96,12 +96,16 @@ python -m money_agent.service_x402
       summarize, sentiment, readability, json_tools, csv_to_json, hash, uuid,
       token, extract, num_stats, market_signal.
       Example:  GET /service/summarize?input=your+long+text+here
+    Prices adjust to DEMAND automatically (pricing.py): a service that sells a
+    lot gets pricier, a quiet one gets cheaper (bounded). See the live analysis:
+      GET /pricing   -> JSON: per-service demand, multiplier, base vs current USD
     Key env vars:
       $env:PAY_TO = "0xeb4B12234218a7A56932a5395d730Ac1ae1C6096"   # your wallet
       $env:X402_NETWORK = "base-sepolia"      # TESTNET first! ("base" = real money)
       $env:X402_FACILITATOR = "https://x402.org/facilitator"   # free testnet facilitator
       $env:X402_BAZAAR = "1"                  # list on the x402 Bazaar (discovery)
       $env:SERVICE_X402_PORT = "8402"         # port (or PORT)
+      $env:X402_DYNAMIC_PRICING = "0"         # optional: pin base prices (default: on)
     Mainnet facilitator (real USDC): https://api.cdp.coinbase.com/platform/v2/x402
       (also needs CDP_API_KEY_ID / CDP_API_KEY_SECRET)
 
