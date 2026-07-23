@@ -72,6 +72,39 @@ def notify_sale(service: str, price_usd: str, *, network: str = "",
     threading.Thread(target=_post, args=(url, content), daemon=True).start()
 
 
+def _detect_host() -> str:
+    """Best-effort label of the cloud platform, from its injected env vars."""
+    if os.environ.get("FLY_APP_NAME"):
+        return f"Fly.io ({os.environ.get('FLY_REGION', '?')})"
+    if os.environ.get("RAILWAY_PROJECT_NAME") or os.environ.get("RAILWAY_SERVICE_NAME"):
+        return f"Railway ({os.environ.get('RAILWAY_ENVIRONMENT_NAME', 'production')})"
+    if os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_NAME"):
+        return f"Render ({os.environ.get('RENDER_SERVICE_NAME', 'service')})"
+    return "local / unknown host"
+
+
+def notify_startup(*, network: str = "", pay_to: str = "") -> None:
+    """One-time "earner online" ping on boot, labeled with the host platform.
+
+    No-op if the webhook is unset or DISCORD_ALERT_ON_START is falsy. Handy to
+    confirm alerts work on each platform and to see restarts/redeploys.
+    """
+    if os.environ.get("DISCORD_ALERT_ON_START", "1").strip().lower() in (
+            "0", "false", "no", "off"):
+        return
+    url = _webhook_url()
+    if not url:
+        return
+    header = f"\U0001F7E2 **x402 earner online** \u2014 {_detect_host()}"
+    meta = []
+    if network:
+        meta.append(f"network `{network}`")
+    if pay_to:
+        meta.append(f"wallet `{pay_to[:6]}\u2026{pay_to[-4:]}`")
+    content = header + ("\n" + " \u00b7 ".join(meta) if meta else "")
+    threading.Thread(target=_post, args=(url, content), daemon=True).start()
+
+
 def main() -> None:
     """`python -m money_agent.notify --test` sends a sample alert (synchronous)."""
     url = _webhook_url()

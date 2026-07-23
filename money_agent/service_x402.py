@@ -31,7 +31,7 @@ import threading
 import time
 
 from .config import Config
-from .notify import notify_sale
+from .notify import notify_sale, notify_startup
 
 PAY_TO = os.environ.get("PAY_TO", "")
 NETWORK = os.environ.get("X402_NETWORK", "eip155:84532")            # Base Sepolia
@@ -196,6 +196,10 @@ def build_app():
     @app.route("/pricing")
     def pricing():
         return jsonify(pricer.analysis())
+
+    # One-time "online" ping (per host) so you can confirm Discord alerts work and
+    # see restarts. Set DISCORD_ALERT_ON_START=0 to suppress just this ping.
+    notify_startup(network=NETWORK, pay_to=PAY_TO)
 
     return app
 
