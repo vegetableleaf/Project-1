@@ -106,8 +106,14 @@ python -m money_agent.service_x402
       $env:X402_BAZAAR = "1"                  # list on the x402 Bazaar (discovery)
       $env:SERVICE_X402_PORT = "8402"         # port (or PORT)
       $env:X402_DYNAMIC_PRICING = "0"         # optional: pin base prices (default: on)
+      $env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."  # optional: ping per sale
     Mainnet facilitator (real USDC): https://api.cdp.coinbase.com/platform/v2/x402
       (also needs CDP_API_KEY_ID / CDP_API_KEY_SECRET)
+
+python -m money_agent.notify --test
+    Send a test Discord alert (needs DISCORD_WEBHOOK_URL set -- a channel webhook
+    from Server Settings -> Integrations -> Webhooks). Each real sale then posts
+    one message: service, price, running sale count/total, network, wallet.
 
 python -m money_agent.x402_buyer
     Simulate a paying customer end-to-end (sign + submit payment) to test the

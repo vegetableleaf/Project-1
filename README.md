@@ -267,6 +267,7 @@ Everything lives in the `money_agent/` package unless noted. Run modules with
 | [`money_agent/service_x402.py`](money_agent/service_x402.py) | Flask app with **x402 payment middleware** on `GET /service/<name>` (port 8402). Prices are resolved **live per request** from demand (see `pricing.py`) via the x402 price hook. Records sales to `x402_sales.json`. `X402_BAZAAR=1` attaches discovery metadata. `GET /pricing` serves the demand/price analysis. `build_app()` is the entry point for waitress/gunicorn. |
 | [`money_agent/pricing.py`](money_agent/pricing.py) | `DemandPricer` — **demand-based dynamic pricing**. Counts each service's paid calls over a rolling window (`x402_sales.json`) and nudges its price up when demand is strong / down when soft, within bounded multipliers (`PRICING_MIN_MULT`..`PRICING_MAX_MULT`), smoothed over time. Writes a snapshot to `service_pricing.json` (served at `/pricing`). Toggle with `X402_DYNAMIC_PRICING=0`. Pure-stdlib, fails safe to base prices. |
 | [`money_agent/x402_buyer.py`](money_agent/x402_buyer.py) | A simulated paying customer (eth_account + x402 client). Signs and submits payment to test the full pay→verify→settle loop. |
+| [`money_agent/notify.py`](money_agent/notify.py) | **Discord sale alerts.** Posts to a Discord channel webhook (`DISCORD_WEBHOOK_URL`) after every fulfilled paid request. Fire-and-forget, fail-safe, pure-stdlib. `python -m money_agent.notify --test` sends a test ping. |
 | [`money_agent/safety.py`](money_agent/safety.py) | `SpendGuard` — **30% daily spend cap** + **kill switch**. State in `spend_state.json`, rolls per day. CLI: `python -m money_agent.safety`. |
 
 ### Host-side reporters (write JSON the Docker dashboard reads)
@@ -468,6 +469,27 @@ $env:X402_BAZAAR = "1"      # attaches discovery metadata so buyers can find it
 python -m money_agent.service_x402
 ```
 
+### Discord alerts (a live feed of real sales)
+
+Get a Discord ping every time someone pays for a service. Create a **channel
+webhook** (Server Settings → Integrations → Webhooks → New Webhook → pick a
+channel → Copy Webhook URL), then set `DISCORD_WEBHOOK_URL` on each host that
+should alert (treat it like a secret — anyone with the URL can post to the
+channel):
+
+```powershell
+# local
+$env:DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/..."
+python -m money_agent.notify --test        # send a test ping to confirm it works
+# cloud (type the URL yourself; don't paste secrets into chat)
+flyctl secrets set DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+railway variables --set "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/..."
+# Render: dashboard -> Environment -> DISCORD_WEBHOOK_URL
+```
+Each fulfilled sale posts one message (service, price, running sale count + total,
+network, wallet). It's fire-and-forget and fail-safe — a Discord outage never
+affects a sale, and buyer input is never included. Unset the var to disable.
+
 ### Safety: spend cap + kill switch (always on)
 
 ```powershell
@@ -573,6 +595,7 @@ keep the colony training and the dashboard fed.
 | `PRICING_MIN_MULT` / `PRICING_MAX_MULT` | pricing | Price multiplier floor/ceiling vs. base (default 0.5 / 3.0). |
 | `PRICING_SENSITIVITY` / `PRICING_SMOOTH` / `PRICING_TTL_SECONDS` | pricing | How hard demand moves price, drift speed (0–1), and min seconds between recomputes (default 1.0 / 0.3 / 60). |
 | `X402_PRIVATE_KEY` | x402_buyer | Test buyer's key (needs test USDC). |
+| `DISCORD_WEBHOOK_URL` | notify / service_x402 | Discord channel webhook; set it to get a ping per sale (unset = off). |
 
 **Networks:** Base Sepolia = `eip155:84532`, Base mainnet = `eip155:8453`.
 **USDC:** Sepolia `0x036CbD53842c5426634e7929541eC2318f3dCF7e`,

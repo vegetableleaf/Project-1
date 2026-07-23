@@ -31,6 +31,7 @@ import threading
 import time
 
 from .config import Config
+from .notify import notify_sale
 
 PAY_TO = os.environ.get("PAY_TO", "")
 NETWORK = os.environ.get("X402_NETWORK", "eip155:84532")            # Base Sepolia
@@ -76,8 +77,11 @@ def _maybe_add_bazaar_metadata(routes) -> None:
             pass
 
 
-def _record_sale(service_name: str, price_units: float) -> None:
-    """Append a paid sale to x402_sales.json (the dashboard earnings panel reads it)."""
+def _record_sale(service_name: str, price_units: float) -> tuple[int, float]:
+    """Append a paid sale to x402_sales.json (the dashboard earnings panel reads it).
+
+    Returns the running (count, usd_total) so callers can report it (e.g. Discord).
+    """
     usd = max(0.001, price_units / 1000.0)
     with _SALES_LOCK:
         try:
@@ -94,6 +98,7 @@ def _record_sale(service_name: str, price_units: float) -> None:
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
         os.replace(tmp, SALES_PATH)
+        return int(data["count"]), float(data["usd_total"])
 
 
 def build_app():
@@ -162,9 +167,12 @@ def build_app():
     def _make_handler(service):
         def handler():
             result = service.fulfill(request.args.get("input", ""))
-            _record_sale(service.name, pricer.price_units(service.name))
+            price_usd = pricer.usd(service.name)
+            count, total = _record_sale(service.name, pricer.price_units(service.name))
+            notify_sale(service.name, price_usd, network=NETWORK, pay_to=PAY_TO,
+                        sales_count=count, sales_usd=total)
             return jsonify({"service": service.name,
-                            "price_usd": pricer.usd(service.name),
+                            "price_usd": price_usd,
                             "result": result})
         handler.__name__ = f"svc_{service.name}"
         return handler
