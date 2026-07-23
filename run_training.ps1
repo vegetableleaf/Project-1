@@ -1,15 +1,22 @@
 # run_training.ps1
 # ---------------------------------------------------------------------------
-# Runner used by the "MoneyAgentTraining" scheduled task. It starts continuous,
-# self-resuming training in the SAFE offline ledger backend (no wallet key) and
-# writes all output to training.log so you can watch progress.
+# Runner used by the "MoneyAgentTraining" scheduled task. It:
+#   1. starts the two dashboard reporters (chain_report + earnings_report --watch,
+#      on Base MAINNET) so the dashboard's on-chain / earnings panels stay fed, and
+#   2. runs continuous, self-resuming offline-ledger training IF this interpreter
+#      has torch (skipped otherwise -- the reporters still run).
+# All output goes to training.log. Paths are relative ($PSScriptRoot) and it
+# prefers the project's .venv, so it is portable across machines.
 #
-# It resumes from checkpoint.pth automatically, so a reboot never loses progress.
+# Training resumes from checkpoint.pth automatically, so a reboot never loses it.
 # ---------------------------------------------------------------------------
 $ErrorActionPreference = "Stop"
 
-$projectDir = "C:\Users\bzhu\Documents\Project1"
-$python     = "C:\Users\bzhu\AppData\Local\Python\pythoncore-3.14-64\python.exe"
+$projectDir = $PSScriptRoot
+# Prefer the project's .venv (Python 3.13 with web3 for the reporters); fall back
+# to whatever `python` is on PATH. (Old hardcoded per-user paths are gone.)
+$venvPython = Join-Path $projectDir ".venv\Scripts\python.exe"
+$python     = if (Test-Path $venvPython) { $venvPython } else { "python" }
 $log        = Join-Path $projectDir "training.log"
 
 Set-Location $projectDir
@@ -47,11 +54,23 @@ $env:MONEY_AGENT_BACKEND    = "ledger"   # offline & safe (no private key needed
 $env:MONEY_AGENT_LOOP_DELAY = "0.5"      # gentle pause between generations (CPU/log friendly)
 
 $utf8 = New-Object System.Text.UTF8Encoding($false)   # UTF-8, no BOM
-[System.IO.File]::AppendAllText($log,
-    "`r`n===== training started $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') =====`r`n", $utf8)
 
-# Run the trainer, appending stdout+stderr to the log as clean UTF-8 bytes.
-# (cmd's >> writes Python's raw UTF-8 output without PowerShell's UTF-16 re-encoding,
-#  so the dashboard can always parse the generation numbers.)
+# Run the trainer ONLY if this interpreter has torch. The project's .venv (used
+# above for the web3 reporters) is torch-free, so a torch-less machine still keeps
+# the dashboard fed -- it just skips the optional offline "colony" training.
 $env:PYTHONIOENCODING = "utf-8"
-& cmd.exe /c "`"$python`" -m money_agent.train >> `"$log`" 2>&1"
+# Detect torch without its "not installed" stderr tripping ErrorActionPreference=Stop.
+$prevEAP = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+& $python -c "import torch" 2>$null 1>$null
+$hasTorch = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEAP
+if ($hasTorch) {
+    [System.IO.File]::AppendAllText($log,
+        "`r`n===== training started $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') =====`r`n", $utf8)
+    # cmd's >> writes Python's raw UTF-8 output without PowerShell's UTF-16 re-encoding,
+    # so the dashboard can always parse the generation numbers.
+    & cmd.exe /c "`"$python`" -m money_agent.train >> `"$log`" 2>&1"
+} else {
+    [System.IO.File]::AppendAllText($log,
+        "`r`n===== reporters running $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'); training skipped (no torch in this interpreter) =====`r`n", $utf8)
+}
