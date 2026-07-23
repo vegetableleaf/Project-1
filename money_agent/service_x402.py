@@ -29,6 +29,7 @@ import json
 import os
 import threading
 import time
+from urllib.parse import quote_plus
 
 from .config import Config
 from .notify import notify_sale, notify_startup
@@ -99,6 +100,97 @@ def _record_sale(service_name: str, price_units: float) -> tuple[int, float]:
             json.dump(data, fh)
         os.replace(tmp, SALES_PATH)
         return int(data["count"]), float(data["usd_total"])
+
+
+# Human-friendly landing-page copy: service name -> (short description, example input).
+_SERVICE_META = {
+    "summarize":     ("Condense long text down to its key sentences.", "Paste a long article or report and get a tight, readable summary of the main points."),
+    "sentiment":     ("Read the mood of text with a labeled score.", "I love this \u2014 it's fast, reliable, and a joy to use!"),
+    "keywords":      ("Surface the most important keywords in any text.", "reinforcement learning agents need reward signals and lots of clean data"),
+    "readability":   ("Score how easy text is to read (Flesch + grade band).", "This is a fairly simple sentence that most people can read with ease."),
+    "text_stats":    ("Word, character and sentence counts in a snap.", "The quick brown fox jumps over the lazy dog."),
+    "extract":       ("Pull emails, URLs, phone numbers or numbers out of text.", "emails: reach me at ada@example.com or sales@acme.io"),
+    "num_stats":     ("Instant descriptive stats \u2014 mean, median, stdev and more.", "3, 7, 2, 9, 4, 11, 6, 8"),
+    "json_tools":    ("Validate, pretty-print or minify any JSON.", '{"b":1,"a":[3,2,1]}'),
+    "csv_to_json":   ("Turn CSV (with a header row) into clean JSON records.", "name,role\nAda,engineer\nGrace,admiral"),
+    "hash":          ("Hash text with SHA-256/512, SHA-1 or MD5.", "sha256: hash this exact string"),
+    "uuid":          ("Generate up to 20 random UUIDv4 identifiers.", "5"),
+    "token":         ("Mint a strong random API key / secret token.", "48"),
+    "shout":         ("Turn text into loud, attention-grabbing capitals.", "big launch news today"),
+    "sma_signal":    ("Moving-average crossover signal from a price series.", "100,101,99,102,105,108,107,110,112,115"),
+    "market_signal": ("The trained model's BUY / HOLD / SELL read on a market.", "BTC-USD"),
+}
+
+_PAGE_TEMPLATE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Services \u00b7 pay-per-call USDC APIs</title>
+<style>
+  :root{--bg:#0b0f1a;--card:#141b2d;--bd:#25314d;--fg:#e8eef7;--mut:#93a1bd;--acc:#4f8cff;--grn:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif;line-height:1.5;color:var(--fg);
+       background:radial-gradient(1200px 600px at 50% -220px,#17223e,#0b0f1a)}
+  .wrap{max-width:1000px;margin:0 auto;padding:44px 20px 64px}
+  .hero{text-align:center;margin-bottom:22px}
+  .hero h1{font-size:36px;margin:0 0 10px;background:linear-gradient(90deg,#7cb0ff,#b98cff);
+           -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--mut);font-size:16px;max-width:640px;margin:0 auto}
+  .badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 2px}
+  .badge{background:var(--card);border:1px solid var(--bd);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--mut)}
+  .badge b{color:var(--fg)} .badge.g b{color:var(--grn)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:28px 0}
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;
+        transition:transform .12s ease,border-color .12s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--acc)}
+  .card header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .svc{font-family:ui-monospace,SFMono-Regular,monospace;font-weight:700;font-size:15px;color:#cfe0ff}
+  .price{background:rgba(63,185,80,.12);color:var(--grn);border:1px solid rgba(63,185,80,.35);
+         border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .desc{color:var(--mut);font-size:14px;margin:0 0 12px}
+  .try{display:inline-flex;align-items:center;gap:8px;font-family:ui-monospace,monospace;font-size:12.5px;
+       color:#9db8ea;text-decoration:none;background:#0d1526;border:1px solid var(--bd);border-radius:8px;padding:7px 10px}
+  .try span{background:var(--acc);color:#fff;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700}
+  .try:hover{border-color:var(--acc);color:#cfe0ff}
+  .how{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:20px 22px}
+  .how h2{margin:0 0 16px;font-size:17px}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+  .step{display:flex;gap:12px;align-items:flex-start}
+  .step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#fff;
+           font-weight:700;font-size:13px;display:grid;place-items:center}
+  .step p{margin:0;font-size:13.5px;color:var(--mut)} .step b{color:var(--fg)}
+  a{color:var(--acc)} code{font-family:ui-monospace,monospace}
+  .foot{text-align:center;color:var(--mut);font-size:13px;margin-top:26px} .foot code{color:#cfe0ff}
+</style></head><body>
+<div class="wrap">
+  <div class="hero">
+    <h1>\U0001FA99 Agent Services</h1>
+    <p><b>__COUNT__</b> instant micro-APIs you can call and pay for per request \u2014 settled in
+    <b>USDC</b> over Coinbase's open <b>x402</b> standard. No signup, no API key, no invoice.
+    Built for humans and autonomous AI agents alike.</p>
+    <div class="badges">
+      <span class="badge">network <b>__NET__</b></span>
+      <span class="badge g">payment <b>gasless</b></span>
+      <span class="badge"><b>__COUNT__</b> services</span>
+      <span class="badge">pays to <b>__WALLET__</b></span>
+    </div>
+  </div>
+
+  <div class="grid">__CARDS__</div>
+
+  <div class="how">
+    <h2>How to buy \u2014 one round-trip</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><p><b>Call</b> any service, e.g. <code>GET /service/summarize?input=\u2026</code></p></div>
+      <div class="step"><div class="n">2</div><p><b>Get a 402</b> Payment Required with the exact USDC price and pay-to address.</p></div>
+      <div class="step"><div class="n">3</div><p><b>Pay &amp; retry</b> with any x402 client \u2014 your agent signs a gasless USDC authorization.</p></div>
+      <div class="step"><div class="n">4</div><p><b>Get JSON</b> back instantly. Prices auto-adjust to demand \u2014 see <a href="/pricing">/pricing</a>.</p></div>
+    </div>
+  </div>
+
+  <p class="foot">Tip: click any service above to see its live <code>402</code> payment challenge \u00b7
+  powered by <a href="https://x402.org" target="_blank" rel="noopener">x402</a> on <code>__NETWORK_ID__</code></p>
+</div>
+</body></html>"""
 
 
 def build_app():
@@ -182,16 +274,26 @@ def build_app():
 
     @app.route("/")
     def index():
-        items = "".join(
-            f"<li><code>GET /service/{n}?input=...</code> &mdash; {pricer.usd(n)} USDC</li>"
-            for n, s in services.items())
-        return (f"<h1>Agent x402 services</h1>"
-                f"<p>Pay-per-call with USDC on <code>{NETWORK}</code>. "
-                f"Receiving wallet: <code>{PAY_TO or '(set PAY_TO!)'}</code></p>"
-                f"<p>Prices adjust automatically to demand &mdash; live analysis "
-                f"at <a href=\"/pricing\">/pricing</a>.</p>"
-                f"<ul>{items}</ul>"
-                f"<p>Unpaid calls return HTTP 402 with payment instructions.</p>")
+        cards = []
+        for n in services:
+            desc, example = _SERVICE_META.get(n, (f"The {n} service.", "your input here"))
+            cards.append(
+                '<article class="card">'
+                f'<header><span class="svc">{n}</span>'
+                f'<span class="price">{pricer.usd(n)} USDC</span></header>'
+                f'<p class="desc">{desc}</p>'
+                f'<a class="try" href="/service/{n}?input={quote_plus(example)}">'
+                f'<span>GET</span> /service/{n}</a>'
+                '</article>')
+        wallet = (PAY_TO[:6] + "\u2026" + PAY_TO[-4:]) if PAY_TO else "(set PAY_TO)"
+        net = ("Base mainnet" if NETWORK == "eip155:8453"
+               else "Base Sepolia testnet" if NETWORK == "eip155:84532" else NETWORK)
+        return (_PAGE_TEMPLATE
+                .replace("__CARDS__", "\n".join(cards))
+                .replace("__COUNT__", str(len(services)))
+                .replace("__NET__", net)
+                .replace("__NETWORK_ID__", NETWORK)
+                .replace("__WALLET__", wallet))
 
     @app.route("/pricing")
     def pricing():
